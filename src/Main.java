@@ -3,28 +3,31 @@ import java.text.SimpleDateFormat;
 import java.io.*;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.List;
+
+import org.apache.commons.csv.*;
+
+import java.io.FileReader;
+import java.io.IOException;
+
+import java.io.Reader;
 
 //Max Faust
-//take data from vsc file, check it, put in db or
-//out into fail vsc. count all the stuff too :)
 
 public class Main {
 
 	public static void main(String[] args) throws IOException {
 
 		String csvFile = "ms3Interview.csv";
-		String line = "";
-		String cvsSplitBy = ",";
 		String writeTo = "bad-data-";
+		String dbOut = " ";
 
 		int goodData = 0;
 		int badData = 0;
 		int totalData = 0;
-		int skip = 0;
 		int bad = 0;
 
 		String timeStamp = new SimpleDateFormat("yyyy.MM.dd.HH.mm.ss").format(new java.util.Date());
-		System.out.println(timeStamp);
 
 		// create file name
 		writeTo = writeTo.concat(timeStamp).concat(".csv");
@@ -32,91 +35,123 @@ public class Main {
 		// create file to write bad-data to, open writer
 		FileWriter csvWriter = new FileWriter(writeTo);
 
-		// parse data
-		try (BufferedReader br = new BufferedReader(new FileReader(csvFile))) {
+		connect();
 
-			while ((line = br.readLine()) != null) {
+		// read in csv file
+		Reader in = new FileReader(csvFile);
+		CSVParser parser = new CSVParser(in, CSVFormat.DEFAULT);
+		List<CSVRecord> list = parser.getRecords();
 
-				String[] split = line.split(cvsSplitBy);
+		// check data quality, and write to file/db
+		for (int i = 0; i < list.size(); i++) {
+			
+			dbOut = "INSERT INTO" + "VALUES ("; 
 
-				if (skip == 0) {
+			System.out.println(list.get(i).get(0));
 
-					// write first line to bad-data file (index)
-					for (int i = 0; i < split.length; i++) {
+			for (int j = 0; j < 10; j++) {
 
-						if (i > 0) {
+				// write index to bad-data
+				if (i == 0) {
 
-							csvWriter.write(",");
-						}
+					if (j > 0) {
 
-						csvWriter.write(split[i]);
-					}
-					
-					csvWriter.write("\n");
-				}
-
-				// skip index line
-				if (skip > 0) {
-
-					totalData++;
-
-					// check data formatting
-					for (int i = 0; i < 10; i++) {
-
-						if (split[i].isEmpty()) {
-
-							bad = 1;
-							break;
-						}
+						csvWriter.write(",");
 					}
 
-					// write good data to db
-					if (bad == 0) {
+					csvWriter.write(list.get(i).get(j));
 
-						goodData++;
-
-						// write to database
-
-						System.out.println("Line #" + skip);
-
-						System.out.println(split[0] + " " + split[1] + " " + split[2] + " " + split[3] + " " + split[4]
-								+ " " + split[5] + " " + split[6] + " " + split[7] + " " + split[8] + " " + split[9]);
-
-						System.out.println("total: " + totalData + " bad: " + badData + " good: " + goodData);
-
-						// write bad data to csv
-					} else if (bad == 1) {
-
-						badData++;
-						bad = 0;
-
-						for (int i = 0; i < split.length; i++) {
-
-							if (i > 0) {
-
-								csvWriter.write(",");
-							}
-
-							csvWriter.write(split[i]);
-						}
-						
+					if (j == 9) {
 						csvWriter.write("\n");
 					}
+				}
+
+				// write out bad data
+				if (bad == 1) {
+
+					if (j > 0) {
+
+						csvWriter.write(",");
+					}
+
+					if (list.get(i).get(j).contains(",")) {
+
+						csvWriter.write("\"");
+						csvWriter.write(list.get(i).get(j));
+						csvWriter.write("\"");
+					} else {
+
+						csvWriter.write(list.get(i).get(j));
+					}
 
 				}
 
-				skip++;
+				// signal bad data
+				if (list.get(i).get(j).isEmpty() && bad != 1) {
+
+					bad = 1;
+					j = -1;
+					badData++;
+				} else if (bad == 0) {
+
+					// write good data to db
+					
+//					if(j < 9) {
+//						
+//						dbOut.concat(list.get(i).get(j) + ",");
+//					}else if(j == 9) {
+//						
+//						dbOut.concat(list.get(i).get(j));
+//					}
+					
+					
+					goodData++;
+				}
 			}
 
-		} catch (IOException e) {
-			e.printStackTrace();
+			// reset bad data flag
+			if (bad == 1) {
+
+				csvWriter.write("\n");
+				bad = 0;
+			}
+
+			totalData++;
 		}
 
-		// write to log
+		// write statistics to log fil
+
+		parser.close();
 
 		csvWriter.flush();
 		csvWriter.close();
 
+	}
+
+	// connect to sqlite in memory db
+	public static void connect() {
+
+		Connection conn = null;
+		try {
+
+			conn = DriverManager.getConnection("jdbc:sqlite::memory:");
+			System.out.println("Connection to SQLite has been established.");
+		} catch (SQLException e) {
+
+			System.out.println(e.getMessage());
+		} finally {
+
+			try {
+
+				if (conn != null) {
+
+					conn.close();
+				}
+			} catch (SQLException ex) {
+
+				System.out.println(ex.getMessage());
+			}
+		}
 	}
 
 }
