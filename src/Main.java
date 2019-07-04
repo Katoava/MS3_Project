@@ -18,8 +18,13 @@ public class Main {
 	private static Connection conn;
 
 	public static void main(String[] args) throws IOException, SQLException {
-
-		String csvFile = "ms3Interview.csv";
+		
+		if(args.length == 0) {
+			System.out.println("Please specify a CSV file.");
+			System.exit(0);
+		}
+		
+		String csvFile = args[0];
 		String writeTo = "bad-data-";
 
 		int goodData = 0;
@@ -34,6 +39,8 @@ public class Main {
 
 		// create file to write bad-data to, open writer
 		FileWriter csvWriter = new FileWriter(writeTo);
+		
+		FileWriter fw=new FileWriter("LOG");    
 
 		connect();
 
@@ -111,8 +118,12 @@ public class Main {
 			totalData++;
 		}
 		
-		// write statistics to log file
-		//test();
+		System.out.println("Writing to LOG");
+		
+		fw.write(timeStamp + ": \n");
+		fw.write(totalData + " lines read.\n" + goodData + " lines added to database.\n" + badData + " lines written to " + writeTo + "\n");    
+		
+		System.out.println("See LOG for data statistics and " + writeTo + " for bad data entries.");
 		
 		parser.close();
 
@@ -120,6 +131,9 @@ public class Main {
 
 		csvWriter.flush();
 		csvWriter.close();
+		
+		fw.flush();
+		fw.close();
 
 	}
 
@@ -156,7 +170,8 @@ public class Main {
 			System.out.println(e.getMessage());
 		}
 	}
-
+	
+	//Insert data into sql database. Convert bools to ints for storage. 
 	public static int insert(String a, String b, String c, String d, String e, String f, String g, String h, String i,
 			String j) {
 
@@ -216,7 +231,9 @@ public class Main {
 		
 		return numRowsInserted;
 	}
-
+	
+	
+	//Query the db, for testing
 	public static void test() {
 
 		Statement stmt = null;
@@ -227,7 +244,6 @@ public class Main {
 			stmt = conn.createStatement();
 			rs = stmt.executeQuery("SELECT a, b, c, d, e, f, g, h, i, j FROM Data");
 			
-		
 			while (rs.next()) {
 		
 				  String line = rs.getString("a");
